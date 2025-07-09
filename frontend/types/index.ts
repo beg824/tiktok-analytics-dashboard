@@ -1,6 +1,6 @@
 export interface TikTokPost {
   id?: number
-  account: string
+  username: string
   post_id: string
   likes: number
   views: number
@@ -11,7 +11,7 @@ export interface TikTokPost {
 }
 
 export interface AccountStats {
-  account: string
+  username: string
   total_posts: number
   total_views: number
   total_likes: number

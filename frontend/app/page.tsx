@@ -9,38 +9,38 @@ import TopPostsTable from '@/components/TopPostsTable'
 import { AccountStats, TikTokPost } from '@/types'
 
 export default function Dashboard() {
-  const [selectedAccount, setSelectedAccount] = useState<string>('')
-  const [accounts, setAccounts] = useState<string[]>([])
+  const [accountsSummary, setAccountsSummary] = useState<AccountStats[]>([])
+  const [selectedUsername, setSelectedUsername] = useState<string>('')
   const [stats, setStats] = useState<AccountStats | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetchAccounts()
+    fetchAccountsSummary()
   }, [])
 
   useEffect(() => {
-    if (selectedAccount) {
-      fetchStats(selectedAccount)
+    if (selectedUsername) {
+      fetchStats(selectedUsername)
     }
-  }, [selectedAccount])
+  }, [selectedUsername])
 
-  const fetchAccounts = async () => {
+  const fetchAccountsSummary = async () => {
     try {
-      const response = await fetch('/api/accounts')
+      const response = await fetch('/api/accounts/summary')
       const data = await response.json()
-      setAccounts(data)
-      if (data.length > 0) {
-        setSelectedAccount(data[0])
+      setAccountsSummary(data)
+      if (data.length > 0 && !selectedUsername) {
+        setSelectedUsername(data[0].username)
       }
     } catch (error) {
-      console.error('Error fetching accounts:', error)
+      console.error('Error fetching account summaries:', error)
     }
   }
 
-  const fetchStats = async (account: string) => {
+  const fetchStats = async (username: string) => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/stats/${account}`)
+      const response = await fetch(`/api/stats/${username}`)
       const data = await response.json()
       setStats(data)
     } catch (error) {
@@ -69,16 +69,45 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Account Selector */}
+        {/* Accounts List View */}
         <div className="mb-8">
-          <AccountSelector
-            accounts={accounts}
-            selectedAccount={selectedAccount}
-            onAccountChange={setSelectedAccount}
-          />
+          <h2 className="text-2xl font-semibold mb-4">Accounts Overview</h2>
+          <div className="overflow-x-auto rounded-lg shadow bg-white">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Posts</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Views</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Likes</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Comments</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Shares</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Views/Post</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {accountsSummary.map((acc) => (
+                  <tr
+                    key={acc.username}
+                    className={`hover:bg-blue-50 cursor-pointer ${selectedUsername === acc.username ? 'bg-blue-100' : ''}`}
+                    onClick={() => setSelectedUsername(acc.username)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{acc.username}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{acc.total_posts}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{acc.total_views.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{acc.total_likes.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{acc.total_comments.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{acc.total_shares.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{acc.avg_views_per_post.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {selectedAccount && (
+        {/* Selected Account Details */}
+        {selectedUsername && (
           <>
             {/* Stats Cards */}
             {stats && (
@@ -115,13 +144,13 @@ export default function Dashboard() {
               {/* Daily Views Chart */}
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Daily Views</h2>
-                <DailyViewsChart account={selectedAccount} />
+                <DailyViewsChart account={selectedUsername} />
               </div>
 
               {/* Top Posts Table */}
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Top Posts</h2>
-                <TopPostsTable account={selectedAccount} />
+                <TopPostsTable account={selectedUsername} showTikTokLink />
               </div>
             </div>
           </>

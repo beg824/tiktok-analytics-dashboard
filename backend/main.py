@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from collections import defaultdict
 
 # Load environment variables
 load_dotenv()
@@ -33,7 +34,7 @@ supabase: Client = create_client(supabase_url, supabase_key)
 # Pydantic models
 class TikTokPost(BaseModel):
     id: Optional[int]
-    account: str
+    username: str
     post_id: str
     likes: int
     views: int
@@ -43,7 +44,7 @@ class TikTokPost(BaseModel):
     date: Optional[str]
 
 class AccountStats(BaseModel):
-    account: str
+    username: str
     total_posts: int
     total_views: int
     total_likes: int
@@ -59,19 +60,52 @@ async def root():
 async def get_accounts():
     """Get all unique TikTok accounts"""
     try:
-        response = supabase.table("tiktok_raw").select("account").execute()
-        accounts = list(set([row["account"] for row in response.data]))
+        response = supabase.table("tiktok_raw").select("username").execute()
+        accounts = list(set([row["username"] for row in response.data]))
         return sorted(accounts)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching accounts: {str(e)}")
 
-@app.get("/posts/{account}", response_model=List[TikTokPost])
-async def get_posts_by_account(account: str, limit: int = 50):
+@app.get("/accounts/summary", response_model=List[AccountStats])
+async def get_accounts_summary():
+    """Get summary stats for all accounts"""
+    try:
+        response = supabase.table("tiktok_raw").select("*").execute()
+        posts = response.data
+        if not posts:
+            return []
+        # Group posts by username
+        grouped = defaultdict(list)
+        for post in posts:
+            grouped[post["username"]].append(post)
+        summaries = []
+        for username, user_posts in grouped.items():
+            total_posts = len(user_posts)
+            total_views = sum(p["views"] for p in user_posts)
+            total_likes = sum(p["likes"] for p in user_posts)
+            total_comments = sum(p["comments"] for p in user_posts)
+            total_shares = sum(p["shares"] for p in user_posts)
+            avg_views_per_post = total_views / total_posts if total_posts > 0 else 0
+            summaries.append(AccountStats(
+                username=username,
+                total_posts=total_posts,
+                total_views=total_views,
+                total_likes=total_likes,
+                total_comments=total_comments,
+                total_shares=total_shares,
+                avg_views_per_post=round(avg_views_per_post, 2)
+            ))
+        return summaries
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching account summaries: {str(e)}")
+
+@app.get("/posts/{username}", response_model=List[TikTokPost])
+async def get_posts_by_account(username: str, limit: int = 50):
     """Get posts for a specific account"""
     try:
         response = supabase.table("tiktok_raw")\
             .select("*")\
-            .eq("account", account)\
+            .eq("username", username)\
             .order("created_at", desc=True)\
             .limit(limit)\
             .execute()
@@ -79,13 +113,13 @@ async def get_posts_by_account(account: str, limit: int = 50):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching posts: {str(e)}")
 
-@app.get("/stats/{account}", response_model=AccountStats)
-async def get_account_stats(account: str):
+@app.get("/stats/{username}", response_model=AccountStats)
+async def get_account_stats(username: str):
     """Get aggregated stats for a specific account"""
     try:
         response = supabase.table("tiktok_raw")\
             .select("*")\
-            .eq("account", account)\
+            .eq("username", username)\
             .execute()
         
         posts = response.data
@@ -100,7 +134,7 @@ async def get_account_stats(account: str):
         avg_views_per_post = total_views / total_posts if total_posts > 0 else 0
         
         return AccountStats(
-            account=account,
+            username=username,
             total_posts=total_posts,
             total_views=total_views,
             total_likes=total_likes,
@@ -113,8 +147,8 @@ async def get_account_stats(account: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching stats: {str(e)}")
 
-@app.get("/daily-views/{account}")
-async def get_daily_views(account: str, days: int = 30):
+@app.get("/daily-views/{username}")
+async def get_daily_views(username: str, days: int = 30):
     """Get daily view counts for the last N days"""
     try:
         # Get posts from the last N days
@@ -123,7 +157,7 @@ async def get_daily_views(account: str, days: int = 30):
         
         response = supabase.table("tiktok_raw")\
             .select("views, created_at")\
-            .eq("account", account)\
+            .eq("username", username)\
             .gte("created_at", start_date.isoformat())\
             .lte("created_at", end_date.isoformat())\
             .execute()
@@ -149,8 +183,8 @@ async def get_daily_views(account: str, days: int = 30):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching daily views: {str(e)}")
 
-@app.get("/top-posts/{account}", response_model=List[TikTokPost])
-async def get_top_posts(account: str, limit: int = 10, sort_by: str = "views"):
+@app.get("/top-posts/{username}", response_model=List[TikTokPost])
+async def get_top_posts(username: str, limit: int = 10, sort_by: str = "views"):
     """Get top posts for an account sorted by specified metric"""
     valid_sort_fields = ["views", "likes", "comments", "shares"]
     if sort_by not in valid_sort_fields:
@@ -159,7 +193,7 @@ async def get_top_posts(account: str, limit: int = 10, sort_by: str = "views"):
     try:
         response = supabase.table("tiktok_raw")\
             .select("*")\
-            .eq("account", account)\
+            .eq("username", username)\
             .order(sort_by, desc=True)\
             .limit(limit)\
             .execute()

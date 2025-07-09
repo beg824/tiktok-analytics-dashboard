@@ -8,7 +8,7 @@ interface TopPostsTableProps {
   account: string
 }
 
-export default function TopPostsTable({ account }: TopPostsTableProps) {
+export default function TopPostsTable({ account, showTikTokLink = false }: TopPostsTableProps & { showTikTokLink?: boolean }) {
   const [posts, setPosts] = useState<TikTokPost[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -47,6 +47,14 @@ export default function TopPostsTable({ account }: TopPostsTableProps) {
     })
   }
 
+  const getTikTokUrl = (post: TikTokPost) => {
+    if (post.url) return post.url
+    if (post.username && post.post_id) {
+      return `https://www.tiktok.com/@${post.username}/video/${post.post_id}`
+    }
+    return '#'
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -78,6 +86,11 @@ export default function TopPostsTable({ account }: TopPostsTableProps) {
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Shares
             </th>
+            {showTikTokLink && (
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                TikTok Link
+              </th>
+            )}
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -113,6 +126,13 @@ export default function TopPostsTable({ account }: TopPostsTableProps) {
                   {formatNumber(post.shares)}
                 </div>
               </td>
+              {showTikTokLink && (
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 underline">
+                  <a href={getTikTokUrl(post)} target="_blank" rel="noopener noreferrer">
+                    View
+                  </a>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
